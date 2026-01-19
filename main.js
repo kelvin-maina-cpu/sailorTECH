@@ -1,4 +1,6 @@
 /* ================= GLOBAL STATE ================= */
+// Replace with your Render deployment URL
+const API_URL = "https://kevs-university.onrender.com";
 
 // Projects will be fetched from server; keep local placeholders while loading
 let projects = [];
@@ -22,7 +24,9 @@ async function fetchJSON(url, opts = {}) {
       if (url === 'projects') { console.warn('Normalized short path "projects" to "/api/projects"'); url = '/api/projects'; }
       else if (url === 'user') { console.warn('Normalized short path "user" to "/api/user"'); url = '/api/user'; }
     }
-    const res = await fetch(url, Object.assign({ headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' }, opts));
+    const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
+    const res = await fetch(fullUrl, Object.assign({ headers: { 'Content-Type': 'application/json' }, credentials: 'include' }, opts));
+
 
     // read raw text first (safer when server returns non-JSON or empty body)
     const text = await res.text();
