@@ -1,6 +1,5 @@
 /* ================= GLOBAL STATE ================= */
-// Replace with your Render deployment URL
-const API_URL = "https://kevs-university.onrender.com";
+const BASE_URL = "https://tech-kevs.onrender.com";
 
 // Projects will be fetched from server; keep local placeholders while loading
 let projects = [];
@@ -21,8 +20,8 @@ async function fetchJSON(url, opts = {}) {
   try {
     // Normalize common short paths (some clients or cached scripts may call 'projects' or 'user')
     if (typeof url === 'string' && !url.startsWith('/') && !url.startsWith('http')) {
-      if (url === 'projects') { console.warn('Normalized short path "projects" to "/api/projects"'); url = '/api/projects'; }
-      else if (url === 'user') { console.warn('Normalized short path "user" to "/api/user"'); url = '/api/user'; }
+      if (url === 'projects') { console.warn('Normalized short path "projects" to `${BASE_URL}/api/user`'); url = `${BASE_URL}/api/user` }
+      else if (url === 'user') { console.warn('Normalized short path "user" to "${BASE_URL}/api/user"'); url = `${BASE_URL}/api/user`; }
     }
     const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
     const res = await fetch(fullUrl, Object.assign({ headers: { 'Content-Type': 'application/json' }, credentials: 'include' }, opts));
@@ -51,7 +50,7 @@ async function fetchJSON(url, opts = {}) {
 // Load projects and project tasks from server if available
 async function loadServerProjects() {
   try {
-    const data = await fetchJSON('/api/projects');
+    const data = await fetchJSON(`${BASE_URL}/api/projects`);
     if (data.projects) projects = data.projects;
     if (data.project_tasks) projectTasks = data.project_tasks;
     renderProjects();
@@ -77,7 +76,7 @@ async function registerUser() {
 
   if (!u || !a || !e || !p) return alert("Please fill all fields.");
   try {
-    const res = await fetchJSON('/api/register', { method: 'POST', body: JSON.stringify({ username: u, admission: a, email: e, password: p }) });
+    const res = await fetchJSON(`${BASE_URL}/api/register`, { method: 'POST', body: JSON.stringify({ username: u, admission: a, email: e, password: p }) });
     // Clear form fields
     document.getElementById('reg-username').value = '';
     document.getElementById('reg-admission').value = '';
@@ -94,7 +93,7 @@ async function loginUser() {
   const username = val("login-username");
   const password = val("login-password");
   try {
-    const res = await fetchJSON('/api/login', { method: 'POST', body: JSON.stringify({ username, password }) });
+    const res = await fetchJSON('`${BASE_URL}/api/login`', { method: 'POST', body: JSON.stringify({ username, password }) });
     if (res && res.success) {
       await loadUserState();
       showPage('portfolio-page');
@@ -106,7 +105,7 @@ async function loginUser() {
 
 async function logout() {
   try {
-    await fetchJSON('/api/logout', { method: 'POST' });
+    await fetchJSON('`${BASE_URL}/api/logout`', { method: 'POST' });
   } catch (e) {
     console.warn('Logout request failed', e);
   }
@@ -235,7 +234,7 @@ function selectProject(index) {
   // fetch user's task completion for this project from server
   (async () => {
     try {
-      const user = await fetchJSON('/api/user');
+      const user = await fetchJSON('${BASE_URL}/api/user');
       const completion = (user.task_completion && user.task_completion[String(index)]) || [];
       renderTasks(index, completion);
       renderChart(index, completion);
@@ -316,7 +315,7 @@ async function renderResearchCharts() {
   // Try to get user state from server; if not available fallback to localStorage
   let user = null;
   try {
-    const res = await fetchJSON('/api/user');
+    const res = await fetchJSON(`${BASE_URL}/api/user`);
     if (res && res.logged_in) user = res;
   } catch (e) {
     user = null;
@@ -476,10 +475,10 @@ function renderTasks(index, completionFromServer) {
 
 async function toggleTask(p, t, checked) {
   try {
-    await fetchJSON('/api/user/progress/task', { method: 'POST', body: JSON.stringify({ project_index: p, task_index: t, checked }) });
+    await fetchJSON('${BASE_URL}/api/user/progress/task', { method: 'POST', body: JSON.stringify({ project_index: p, task_index: t, checked }) });
     // update chart using server-side state (fetch /api/user)
     try {
-      const user = await fetchJSON('/api/user');
+      const user = await fetchJSON('${BASE_URL}/api/user');
       const completion = (user.task_completion && user.task_completion[String(p)]) || [];
       renderChart(p, completion);
       // update small research charts to reflect this change
@@ -548,7 +547,7 @@ async function completeProject() {
   if (isNaN(index)) return alert('No project selected');
 
   try {
-    const res = await fetchJSON('/api/user/progress/complete', { method: 'POST', body: JSON.stringify({ project_index: index }) });
+    const res = await fetchJSON('${BASE_URL}/api/user/progress/complete', { method: 'POST', body: JSON.stringify({ project_index: index }) });
     if (res && res.success) {
       // sync client state with server response
       unlockedIndex = res.unlocked_index;
@@ -649,7 +648,7 @@ setInterval(nextSlide, 5000);
 async function initializeApp() {
   await loadServerProjects();
   try {
-    const user = await fetchJSON('/api/user');
+    const user = await fetchJSON(`${BASE_URL}/api/user`);
     if (user && user.logged_in) {
       await loadUserState();
       showPage('portfolio-page');
@@ -666,7 +665,7 @@ async function initializeApp() {
 
 async function loadUserState() {
   try {
-    const user = await fetchJSON('/api/user');
+    const user = await fetchJSON(`${BASE_URL}/api/user`);
     if (user && user.logged_in) {
       unlockedIndex = parseInt(user.unlocked_index) || 0;
       completedProjects = user.completed_projects || [];
@@ -690,7 +689,7 @@ initializeApp();
 async function resetProgress() {
   if (!confirm('Reset all progress?')) return;
   try {
-    await fetchJSON('/api/user/progress/reset', { method: 'POST' });
+    await fetchJSON('${BASE_URL}/api/user/progress/reset', { method: 'POST' });
     await loadUserState();
     alert('Progress reset on server.');
   } catch (err) {
