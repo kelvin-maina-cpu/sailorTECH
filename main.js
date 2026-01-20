@@ -1,5 +1,3 @@
-
-
 // Projects will be fetched from server; keep local placeholders while loading
 let projects = [];
 let projectTasks = [];
