@@ -1,5 +1,4 @@
-/* ================= GLOBAL STATE ================= */
-const BASE_URL = "https://tech-kevs7.onrender.com";
+
 
 // Projects will be fetched from server; keep local placeholders while loading
 let projects = [];
@@ -720,14 +719,34 @@ async function loadChatHistory() {
   }
 }
 
-function sendChatMessage() {
+async function sendChatMessage() {
+  if (!chatInput) return;
   const text = chatInput.value.trim();
   if (!text) return;
+
+  // optimistically append
   appendChatMessage('user', text, new Date().toISOString());
   chatInput.value = '';
-  appendChatMessage('bot', "This is a static demo reply.", new Date().toISOString());
-}
 
+  try {
+    const res = await fetchJSON(`${BASE_URL}/api/chat`, {
+      method: 'POST',
+      body: JSON.stringify({ text })
+    });
+    if (res && res.success) {
+      appendChatMessage('bot', res.reply, new Date().toISOString());
+    }
+  } catch (e) {
+    appendChatMessage('bot', 'Chat unavailable (server offline).', new Date().toISOString());
+  }
+
+
+    } else {
+      appendChatMessage('bot', res.message || 'No reply from server', new Date().toISOString());
+    }
+   catch (err) {
+    appendChatMessage('bot', 'Failed to send message (server offline or not authenticated).', new Date().toISOString());
+  }
 
 
 // Toggle chat visibility (header click) and wire events
