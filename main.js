@@ -1,5 +1,5 @@
 /* ================= GLOBAL STATE ================= */
-const BASE_URL = "https://tech-kevs.onrender.com";
+const BASE_URL = "https://tech-kevs7.onrender.com";
 
 // Projects will be fetched from server; keep local placeholders while loading
 let projects = [];
@@ -19,11 +19,16 @@ if (!localStorage.getItem("userPoints")) localStorage.setItem("userPoints", "0")
 async function fetchJSON(url, opts = {}) {
   try {
     // Normalize common short paths (some clients or cached scripts may call 'projects' or 'user')
-    if (typeof url === 'string' && !url.startsWith('/') && !url.startsWith('http')) {
-      if (url === 'projects') { console.warn('Normalized short path "projects" to `${BASE_URL}/api/user`'); url = `${BASE_URL}/api/user` }
-      else if (url === 'user') { console.warn('Normalized short path "user" to "${BASE_URL}/api/user"'); url = `${BASE_URL}/api/user`; }
-    }
-    const fullUrl = url.startsWith('http') ? url : `${API_URL}${url}`;
+  if (typeof url === 'string' && !url.startsWith('/') && !url.startsWith('http')) {
+  if (url === 'projects') { 
+    console.warn('Normalized short path "projects" to `${BASE_URL}/api/projects`'); 
+    url = `${BASE_URL}/api/projects`; 
+  } else if (url === 'user') { 
+    console.warn('Normalized short path "user" to `${BASE_URL}/api/user`'); 
+    url = `${BASE_URL}/api/user`; 
+  }
+}
+    const fullUrl = url.startsWith('http') ? url : `${BASE_URL}${url}`;
     const res = await fetch(fullUrl, Object.assign({ headers: { 'Content-Type': 'application/json' }, credentials: 'include' }, opts));
 
 
@@ -47,19 +52,19 @@ async function fetchJSON(url, opts = {}) {
   }
 }
 
-// Load projects and project tasks from server if available
-async function loadServerProjects() {
-  try {
-    const data = await fetchJSON(`${BASE_URL}/api/projects`);
-    if (data.projects) projects = data.projects;
-    if (data.project_tasks) projectTasks = data.project_tasks;
-    renderProjects();
-      // render research charts once projects are available
-      try { renderResearchCharts(); } catch (e) { /* ignore */ }
-  } catch (e) {
-    console.warn('Could not load projects from server, using local data if present');
-  }
+function loadServerProjects() {
+  // Static projects defined locally
+  projects = [
+    { id: 0, name: "Web-Based Organizational Support System", description: "Helps organizations manage info...", image: "images/kevs4.jpeg" },
+    { id: 1, name: "Student Information Management System", description: "Manages student records...", image: "images/kevs2.jpeg" }
+  ];
+  projectTasks = [
+    ["Requirement Gathering", "Design", "Development", "Testing", "Deployment"],
+    ["Student Data Entry", "Grades Input", "Attendance Tracking", "Reporting"]
+  ];
+  renderProjects();
 }
+
 
 /* ================= PAGE CONTROL ================= */
 function showPage(id) {
@@ -68,44 +73,39 @@ function showPage(id) {
 }
 
 /* ================= AUTH ================= */
-async function registerUser() {
+function registerUser() {
   const u = reg("username");
-  const a = reg("admission");
   const e = reg("email");
   const p = reg("password");
 
-  if (!u || !a || !e || !p) return alert("Please fill all fields.");
-  try {
-    const res = await fetchJSON(`${BASE_URL}/api/register`, { method: 'POST', body: JSON.stringify({ username: u, admission: a, email: e, password: p }) });
-    // Clear form fields
-    document.getElementById('reg-username').value = '';
-    document.getElementById('reg-admission').value = '';
-    document.getElementById('reg-email').value = '';
-    document.getElementById('reg-password').value = '';
-    alert(res.message || 'Account created successfully. Please log in.');
-    showPage('login-page');
-  } catch (err) {
-    alert(err.message || 'Could not register (server error)');
+  if (!u || !e || !p) {
+    alert("Please fill all fields.");
+    return;
+  }
+
+  localStorage.setItem("user", JSON.stringify({ username: u, email: e, password: p }));
+  alert("Account created locally. Please log in.");
+  showPage("login-page");
+}
+
+
+function loginUser() {
+  const username = val("login-username");
+  const password = val("login-password");
+  const saved = JSON.parse(localStorage.getItem("user")) || {};
+
+  if (saved.username === username && saved.password === password) {
+    document.getElementById("user-info").innerText = `Signed in as: ${username}`;
+    showPage("portfolio-page");
+  } else {
+    alert("Invalid credentials (local check).");
   }
 }
 
-async function loginUser() {
-  const username = val("login-username");
-  const password = val("login-password");
-  try {
-    const res = await fetchJSON('`${BASE_URL}/api/login`', { method: 'POST', body: JSON.stringify({ username, password }) });
-    if (res && res.success) {
-      await loadUserState();
-      showPage('portfolio-page');
-    }
-  } catch (err) {
-    alert(err.message || 'Login failed');
-  }
-}
 
 async function logout() {
   try {
-    await fetchJSON('`${BASE_URL}/api/logout`', { method: 'POST' });
+    await fetchJSON(`${BASE_URL}/api/logout`, { method: 'POST' });
   } catch (e) {
     console.warn('Logout request failed', e);
   }
@@ -234,7 +234,7 @@ function selectProject(index) {
   // fetch user's task completion for this project from server
   (async () => {
     try {
-      const user = await fetchJSON('${BASE_URL}/api/user');
+      const user = await fetchJSON(`${BASE_URL}/api/user`);
       const completion = (user.task_completion && user.task_completion[String(index)]) || [];
       renderTasks(index, completion);
       renderChart(index, completion);
@@ -473,29 +473,14 @@ function renderTasks(index, completionFromServer) {
   });
 }
 
-async function toggleTask(p, t, checked) {
-  try {
-    await fetchJSON('${BASE_URL}/api/user/progress/task', { method: 'POST', body: JSON.stringify({ project_index: p, task_index: t, checked }) });
-    // update chart using server-side state (fetch /api/user)
-    try {
-      const user = await fetchJSON('${BASE_URL}/api/user');
-      const completion = (user.task_completion && user.task_completion[String(p)]) || [];
-      renderChart(p, completion);
-      // update small research charts to reflect this change
-      try { renderResearchCharts(); } catch (e) { /* ignore */ }
-    } catch (e) {
-      renderChart(p);
-      try { renderResearchCharts(); } catch (ee) { /* ignore */ }
-    }
-  } catch (err) {
-    // fallback to localStorage when server not available
-    let completion = JSON.parse(localStorage.getItem("taskCompletion")) || {};
-    if (!completion[p]) completion[p] = [];
-    completion[p][t] = checked;
-    localStorage.setItem("taskCompletion", JSON.stringify(completion));
-    renderChart(p);
-  }
+function toggleTask(p, t, checked) {
+  let completion = JSON.parse(localStorage.getItem("taskCompletion")) || {};
+  if (!completion[p]) completion[p] = [];
+  completion[p][t] = checked;
+  localStorage.setItem("taskCompletion", JSON.stringify(completion));
+  renderChart(p);
 }
+
 
 /* ================= CHART ================= */
 function renderChart(index, completionFromServer) {
@@ -541,47 +526,20 @@ function renderChart(index, completionFromServer) {
   });
 }
 
-/* ================= COMPLETE PROJECT ================= */
-async function completeProject() {
-  const index = (typeof window._currentProject !== 'undefined') ? window._currentProject : parseInt(localStorage.getItem("currentProject"));
-  if (isNaN(index)) return alert('No project selected');
-
-  try {
-    const res = await fetchJSON('${BASE_URL}/api/user/progress/complete', { method: 'POST', body: JSON.stringify({ project_index: index }) });
-    if (res && res.success) {
-      // sync client state with server response
-      unlockedIndex = res.unlocked_index;
-      completedProjects = res.completed_projects;
-      userPoints = res.points;
-      updatePointsDisplay();
-      showBadges();
-      renderProjects();
-      updateProjectsProgressBar();
-      try { renderResearchCharts(); } catch (e) { /* ignore */ }
-      alert('Project completed! You earned 50 points and the next project unlocked.');
-    }
-  } catch (err) {
-    // fallback to local behavior if server unreachable
-    const idx = index;
-    if (!completedProjects.includes(idx)) {
-      completedProjects.push(idx);
-      localStorage.setItem("completedProjects", JSON.stringify(completedProjects));
-      userPoints = parseInt(localStorage.getItem('userPoints')) || 0;
-      userPoints += 50;
-      localStorage.setItem('userPoints', userPoints);
-      if (idx === unlockedIndex && unlockedIndex < projects.length - 1) {
-        unlockedIndex++;
-        localStorage.setItem("unlockedIndex", unlockedIndex);
-      }
-      alert('Project completed locally. Next project unlocked when server is available.');
-    }
-    renderProjects();
-    updateProjectsProgressBar();
-    updatePointsDisplay();
-    showBadges();
+function completeProject() {
+  const idx = window._currentProject;
+  let completedProjects = JSON.parse(localStorage.getItem("completedProjects")) || [];
+  if (!completedProjects.includes(idx)) {
+    completedProjects.push(idx);
+    localStorage.setItem("completedProjects", JSON.stringify(completedProjects));
+    let points = parseInt(localStorage.getItem("userPoints")) || 0;
+    points += 50;
+    localStorage.setItem("userPoints", points);
+    alert("Project completed locally. You earned 50 points.");
   }
-  backToProjects();
+  renderProjects();
 }
+
 
 
 /* ================= PROGRESS BAR ================= */
@@ -689,7 +647,7 @@ initializeApp();
 async function resetProgress() {
   if (!confirm('Reset all progress?')) return;
   try {
-    await fetchJSON('${BASE_URL}/api/user/progress/reset', { method: 'POST' });
+    await fetchJSON(`${BASE_URL}/api/user/progress/reset`, { method: 'POST' });
     await loadUserState();
     alert('Progress reset on server.');
   } catch (err) {
@@ -755,40 +713,22 @@ function appendChatMessage(who, text, time) {
 
 async function loadChatHistory() {
   try {
-    const res = await fetchJSON('/api/chat');
+    const res = await fetchJSON(`${BASE_URL}/api/chat`);
     if (res && res.success) renderChatHistory(res.history || []);
   } catch (e) {
     appendChatMessage('bot', 'Chat unavailable (server offline or not authenticated).', new Date().toISOString());
   }
 }
 
-async function sendChatMessage() {
-  if (!chatInput) return;
+function sendChatMessage() {
   const text = chatInput.value.trim();
   if (!text) return;
-  // optimistically append
   appendChatMessage('user', text, new Date().toISOString());
   chatInput.value = '';
-  // show a temporary typing indicator
-  const typingId = 'typing-' + Date.now();
-  appendChatMessage('bot', '…', new Date().toISOString());
-  try {
-    const res = await fetchJSON('/api/chat', { method: 'POST', body: JSON.stringify({ message: text }) });
-    // remove the last bot 'typing' message and render history returned by server
-    // simple strategy: clear and re-render server history if provided
-    if (res && res.success) {
-      if (Array.isArray(res.history)) renderChatHistory(res.history);
-      else if (res.reply) {
-        // append bot reply
-        appendChatMessage('bot', res.reply.text || res.reply, new Date().toISOString());
-      }
-    } else {
-      appendChatMessage('bot', res.message || 'No reply from server', new Date().toISOString());
-    }
-  } catch (err) {
-    appendChatMessage('bot', 'Failed to send message (server offline or not authenticated).', new Date().toISOString());
-  }
+  appendChatMessage('bot', "This is a static demo reply.", new Date().toISOString());
 }
+
+
 
 // Toggle chat visibility (header click) and wire events
 if (chatBox) {
